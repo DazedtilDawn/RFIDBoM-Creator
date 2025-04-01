@@ -50,11 +50,12 @@ material_parts = {
 pole_part_nums = sorted([p for p, d in clinton_parts.items() if d["type"] == "pole"])
 
 # --- BoM Generation Functions ---
-def generate_clinton_bom(project_id, reader_count, pole_quantities):
+def generate_clinton_bom(project_id, store_name, reader_count, pole_quantities):
     """
     Generates the Bill of Materials list based on user inputs.
     Args:
         project_id (str): The project identifier.
+        store_name (str): The store name.
         reader_count (int): Total number of readers (determines accessory counts).
         pole_quantities (dict): Dictionary with pole part numbers as keys and quantities as values.
     Returns:
@@ -394,174 +395,277 @@ def create_excel_bytes(df, sheet_title, store_name=None):
     return buffer
 
 # --- Streamlit App Layout ---
-st.set_page_config(layout="wide") # Use wider layout for more space
-st.title("RFID BoM Generator")
-st.write("Fill in the details below to generate the Bill of Materials for Clinton poles and material orders.")
-
-# Create tabs for Clinton Poles and Material Order
-tab1, tab2, tab3 = st.tabs(["Clinton Pole Order", "Material Order", "Service Now Request"])
-
-# --- Session State for Sharing Data Between Tabs ---
-if 'project_id' not in st.session_state:
-    st.session_state.project_id = ""
+# Initialize session state for store name and project ID if not already set
 if 'store_name' not in st.session_state:
     st.session_state.store_name = ""
-if 'reader_count' not in st.session_state:
-    st.session_state.reader_count = 0
-if 'cable_quantity' not in st.session_state:
-    # Default cable quantity based on target image (Anixter)
-    st.session_state.cable_quantity = 4 # Defaulting to 4 based on example
+    
+if 'project_id' not in st.session_state:
+    st.session_state.project_id = ""
+
+# Initialize pole quantities dictionary in session state if not already set
 if 'pole_quantities_input' not in st.session_state:
-     st.session_state.pole_quantities_input = {p: 0 for p in pole_part_nums}
+    st.session_state.pole_quantities_input = {}
+
+# Initialize session state for reader count if not already set
+if 'reader_count' not in st.session_state:
+    st.session_state.reader_count = 1
+
+# Initialize session state for cable quantity if not already set
+if 'cable_quantity' not in st.session_state:
+    st.session_state.cable_quantity = 500
+
+# Initialize session state for address input if not already set
+if 'address_input' not in st.session_state:
+    st.session_state.address_input = ""
+
+# Set up the app layout
+st.set_page_config(page_title="RFID BoM Generator", layout="wide")
+st.title("RFID BoM Generator")
+
+# Create tabs
+tab1, tab2, tab3, tab4 = st.tabs(["Clinton Pole Order", "Material Order", "Service Now Request", "Help"])
 
 # ----- CLINTON POLE ORDER TAB -----
 with tab1:
     st.header("Clinton Pole Order")
+    
+    # Create a nice card-like container for project information
+    with st.container():
+        st.subheader("Project Information")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Project ID input - using on_change callback instead of direct assignment
+            project_id = st.text_input("Project ID", value=st.session_state.project_id, key="project_id_input", 
+                                      on_change=lambda: setattr(st.session_state, 'project_id', st.session_state.project_id_input))
+            
+        with col2:
+            # Store name input - using on_change callback instead of direct assignment
+            store_name = st.text_input("Store Name", value=st.session_state.store_name, key="store_name_input",
+                                      on_change=lambda: setattr(st.session_state, 'store_name', st.session_state.store_name_input))
+    
+    # Reader count in its own section
+    with st.container():
+        st.subheader("RFID Reader Count")
+        reader_count = st.number_input("Number of RFID Readers", min_value=1, step=1, value=st.session_state.reader_count, key="reader_count_input",
+                                     on_change=lambda: setattr(st.session_state, 'reader_count', st.session_state.reader_count_input))
+    
+    # Add a separator
+    st.markdown("---")
+    
+    # Clinton Pole Selection with improved layout
+    st.subheader("Clinton Pole Selection")
+    
+    # Create a two-column layout for pole selection and summary
+    pole_col, summary_col = st.columns([2, 1])
+    
+    with pole_col:
+        # Function to update pole quantities in session state
+        def update_pole_qty(part_num):
+            st.session_state.pole_quantities_input[part_num] = st.session_state[f"qty_{part_num}"]
+        
+        # Filter the poles from the clinton_parts dictionary
+        pole_part_nums = [k for k, v in clinton_parts.items() if v.get("type") == "pole"]
+        
+        # Initialize the pole quantities dictionary
+        pole_quantities_input = {}
+        
+        # Use expanders for each pole category
+        with st.expander("3ft Poles", expanded=True):
+            cols = st.columns(2)
+            with cols[0]:
+                if "CE-CP3W" in clinton_parts:
+                    label = "3ft White Pole"
+                    pole_quantities_input["CE-CP3W"] = st.number_input(
+                        label, 
+                        min_value=0, 
+                        step=1, 
+                        value=st.session_state.pole_quantities_input.get("CE-CP3W", 0), 
+                        key=f"qty_CE-CP3W", 
+                        on_change=update_pole_qty, 
+                        args=("CE-CP3W",)
+                    )
+            with cols[1]:
+                if "CE-CP3B" in clinton_parts:
+                    label = "3ft Black Pole"
+                    pole_quantities_input["CE-CP3B"] = st.number_input(
+                        label, 
+                        min_value=0, 
+                        step=1, 
+                        value=st.session_state.pole_quantities_input.get("CE-CP3B", 0), 
+                        key=f"qty_CE-CP3B", 
+                        on_change=update_pole_qty, 
+                        args=("CE-CP3B",)
+                    )
+        
+        with st.expander("6ft Poles", expanded=True):
+            cols = st.columns(2)
+            with cols[0]:
+                if "CE-CP6W" in clinton_parts:
+                    label = "6ft White Pole"
+                    pole_quantities_input["CE-CP6W"] = st.number_input(
+                        label, 
+                        min_value=0, 
+                        step=1, 
+                        value=st.session_state.pole_quantities_input.get("CE-CP6W", 0), 
+                        key=f"qty_CE-CP6W", 
+                        on_change=update_pole_qty, 
+                        args=("CE-CP6W",)
+                    )
+            with cols[1]:
+                if "CE-CP6B" in clinton_parts:
+                    label = "6ft Black Pole"
+                    pole_quantities_input["CE-CP6B"] = st.number_input(
+                        label, 
+                        min_value=0, 
+                        step=1, 
+                        value=st.session_state.pole_quantities_input.get("CE-CP6B", 0), 
+                        key=f"qty_CE-CP6B", 
+                        on_change=update_pole_qty, 
+                        args=("CE-CP6B",)
+                    )
 
-    # --- Input Section ---
-    st.subheader("1. Enter Order Details")
-
-    # Use columns for better layout
-    col1, col2 = st.columns([1, 2]) # Make second column wider
-
-    with col1:
-        project_id = st.text_input("Project ID:", key="project_id_clinton", value=st.session_state.project_id, on_change=lambda: setattr(st.session_state, 'project_id', st.session_state.project_id_clinton))
-        store_name = st.text_input("Store Name:", key="store_name_clinton", value=st.session_state.store_name, on_change=lambda: setattr(st.session_state, 'store_name', st.session_state.store_name_clinton))
-        reader_count = st.number_input("Total Number of Readers:", min_value=0, step=1, value=st.session_state.reader_count, key="reader_count_clinton",
-                                       help="This determines the quantity for Mounting Plates (CE-CPUP) and Beam Clamps (CE-CPBCM)", on_change=lambda: setattr(st.session_state, 'reader_count', st.session_state.reader_count_clinton))
-
-    with col2:
-        st.subheader("Pole Quantities")
-        pole_quantities_input = {} # Local dict for this run
-
-        # Function to update session state for pole quantities
-        def update_pole_qty(part_num_key):
-            st.session_state.pole_quantities_input[part_num_key] = st.session_state[f"qty_{part_num_key}"]
-
-        # Group poles by height and color for better organization
-        # 3ft poles
-        st.markdown("**1-3ft Poles**")
-        if "CE-CP3W" in clinton_parts:
-            label = "CE-CP3W (1-3ft White Pole)"
-            pole_quantities_input["CE-CP3W"] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get("CE-CP3W", 0), key=f"qty_CE-CP3W", on_change=update_pole_qty, args=("CE-CP3W",))
-        if "CE-CP3B" in clinton_parts:
-            label = "CE-CP3B (1-3ft Black Pole)"
-            pole_quantities_input["CE-CP3B"] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get("CE-CP3B", 0), key=f"qty_CE-CP3B", on_change=update_pole_qty, args=("CE-CP3B",))
-
-        # 6ft poles
-        st.markdown("**3-6ft Poles**")
-        if "CE-CP6W" in clinton_parts:
-            label = "CE-CP6W (3-6ft White Pole)"
-            pole_quantities_input["CE-CP6W"] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get("CE-CP6W", 0), key=f"qty_CE-CP6W", on_change=update_pole_qty, args=("CE-CP6W",))
-        if "CE-CP6B" in clinton_parts:
-            label = "CE-CP6B (3-6ft Black Pole)"
-            pole_quantities_input["CE-CP6B"] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get("CE-CP6B", 0), key=f"qty_CE-CP6B", on_change=update_pole_qty, args=("CE-CP6B",))
-
-        # 12ft poles
-        st.markdown("**6-12ft Poles**")
-        if "CE-CP412B" in clinton_parts:
-            label = "CE-CP412B (Adjustable from 3' 11.25\" to 10' 11.25\", Black, UL)"
-            pole_quantities_input["CE-CP412B"] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get("CE-CP412B", 0), key=f"qty_CE-CP412B", on_change=update_pole_qty, args=("CE-CP412B",))
-        if "CE-CP412B-2PK" in clinton_parts:
-            label = "CE-CP412B-2PK (Adjustable from 3' 11.25\" to 10' 11.25\", Black, UL Two Poles per Box, Sold as Pair)"
-            pole_quantities_input["CE-CP412B-2PK"] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get("CE-CP412B-2PK", 0), key=f"qty_CE-CP412B-2PK", on_change=update_pole_qty, args=("CE-CP412B-2PK",))
-        if "CE-CP412W" in clinton_parts:
-            label = "CE-CP412W (Adjustable from 3' 11.25\" to 10' 11.25\", White, UL)"
-            pole_quantities_input["CE-CP412W"] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get("CE-CP412W", 0), key=f"qty_CE-CP412W", on_change=update_pole_qty, args=("CE-CP412W",))
-        if "CE-CP412W-2PK" in clinton_parts:
-            label = "CE-CP412W-2PK (Adjustable from 3' 11.25\" to 10' 11.25\", White, UL Two Poles per Box, Sold as Pair)"
-            pole_quantities_input["CE-CP412W-2PK"] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get("CE-CP412W-2PK", 0), key=f"qty_CE-CP412W-2PK", on_change=update_pole_qty, args=("CE-CP412W-2PK",))
-
-        # Make sure we include any other poles that might be added in the future
+        with st.expander("Adjustable Poles (3'-11\" to 10'-11\")", expanded=True):
+            # Single poles layout - using the full width now that we've removed the 2-pack option
+            cols = st.columns(2)
+            with cols[0]:
+                if "CE-CP412W" in clinton_parts:
+                    label = "Adjustable White Pole"
+                    pole_quantities_input["CE-CP412W"] = st.number_input(
+                        label, 
+                        min_value=0, 
+                        step=1, 
+                        value=st.session_state.pole_quantities_input.get("CE-CP412W", 0), 
+                        key=f"qty_CE-CP412W", 
+                        on_change=update_pole_qty, 
+                        args=("CE-CP412W",)
+                    )
+            with cols[1]:
+                if "CE-CP412B" in clinton_parts:
+                    label = "Adjustable Black Pole"
+                    pole_quantities_input["CE-CP412B"] = st.number_input(
+                        label, 
+                        min_value=0, 
+                        step=1, 
+                        value=st.session_state.pole_quantities_input.get("CE-CP412B", 0), 
+                        key=f"qty_CE-CP412B", 
+                        on_change=update_pole_qty, 
+                        args=("CE-CP412B",)
+                    )
+            
+            # Add info message about 2-pack optimization
+            st.info("**Note:** When ordering 2 or more adjustable poles, the system will automatically use 2-packs to optimize cost.")
+            
+            # 2-Pack poles are now handled automatically and not shown in the UI
+            # We still add them to the dictionary with zero quantity for the algorithm to use
+            if "CE-CP412W-2PK" in clinton_parts:
+                pole_quantities_input["CE-CP412W-2PK"] = 0
+            if "CE-CP412B-2PK" in clinton_parts:
+                pole_quantities_input["CE-CP412B-2PK"] = 0
+        
+        # Add other poles not in the main categories directly to pole_quantities_input 
+        # but don't display them in the UI
         other_poles = [p for p in pole_part_nums if p not in ["CE-CP3W", "CE-CP3B", "CE-CP6W", "CE-CP6B", "CE-CP412B", "CE-CP412B-2PK", "CE-CP412W", "CE-CP412W-2PK"]]
         if other_poles:
-            st.markdown("**Other Poles**")
             for part_num in other_poles:
-                try:
-                    short_desc = clinton_parts[part_num]['desc'].split(',')[1].strip() + ", " + clinton_parts[part_num]['desc'].split(',')[-1].strip()
-                except:
-                    short_desc = clinton_parts[part_num]['desc'][:30] + "..." # Fallback
-
-                label = f"{part_num} ({short_desc})"
-                pole_quantities_input[part_num] = st.number_input(label, min_value=0, step=1, value=st.session_state.pole_quantities_input.get(part_num, 0), key=f"qty_{part_num}", on_change=update_pole_qty, args=(part_num,))
-
-        # Update the session state with the latest inputs from this run
-        st.session_state.pole_quantities_input.update(pole_quantities_input)
-
-
-    # --- Generate BoM Button and Output Section ---
-    st.header("2. Generate Bill of Materials")
-
-    if st.button("Generate Clinton Pole BoM", key="generate_clinton_button"):
-        # Use quantities from session state which reflects current inputs
-        current_pole_quantities = st.session_state.pole_quantities_input
-
-        # Basic validation
-        if not st.session_state.project_id:
-            st.warning("⚠️ Please enter a Project ID.")
-            st.stop()
-
-        if st.session_state.reader_count == 0 and all(qty == 0 for qty in current_pole_quantities.values()):
-             st.warning("⚠️ Please enter quantities for at least one pole OR set 'Total Number of Readers' > 0.")
-             st.stop()
-
-        # Call the generation function
-        generated_bom_list = generate_clinton_bom(st.session_state.project_id, st.session_state.reader_count, current_pole_quantities)
-
-        if generated_bom_list:
-            # Convert list of dictionaries to Pandas DataFrame
-            bom_df = pd.DataFrame(generated_bom_list)
-
-            # Define the exact column order needed for create_excel_bytes (A-G)
-            column_order = ["Project", "Required Supplier", "Manufacturer", "Manufacturer Part #",
-                            "Description", "Quantity", "Cost"]
-            # Ensure all expected columns exist, add if missing
-            for col in column_order:
-                 if col not in bom_df.columns:
-                     bom_df[col] = None # Add missing column if needed
-            bom_df = bom_df[column_order] # Reorder
-
-            # --- Display in Streamlit (Optional - formatted) ---
-            # Make a display copy with formatted currency for Streamlit view
-            display_df = bom_df.copy()
-            # Add calculated Extended Cost for display
-            display_df["Extended Cost"] = display_df["Quantity"] * display_df["Cost"]
-            display_df["Cost"] = display_df["Cost"].map('${:,.2f}'.format)
-            display_df["Extended Cost"] = display_df["Extended Cost"].map('${:,.2f}'.format)
-            # Add empty columns for display matching Excel layout
-            display_df[" "] = "" # Column I placeholder
-            display_df["Price Expiration"] = "" # Column J placeholder
-            display_order = ["Project", "Required Supplier", "Manufacturer", "Manufacturer Part #",
-                             "Description", "Quantity", "Cost", "Extended Cost", " ", "Price Expiration"]
-            st.subheader("Generated Clinton BoM (Preview)")
-            st.dataframe(display_df[display_order], hide_index=True, use_container_width=True) # Display the table
-
-            # --- Export to Excel ---
-            # Create the Excel file using the consolidated function
-            # Pass the DataFrame with columns A-G only
-            excel_bytes = create_excel_bytes(bom_df[column_order], "Clinton BoM")
-
-            # Create a download button
-            filename = f'Clinton BOM {st.session_state.store_name}'
-            if not st.session_state.store_name:
-                filename = f'Clinton BOM {st.session_state.project_id.replace(" ", "_").replace("/", "-")}'
-
-            st.download_button(
-                label="Download Clinton BoM as Excel",
-                data=excel_bytes,
-                file_name=f'{filename}.xlsx',
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                key='download_clinton_excel'
-            )
-
-            # Store raw data in session state if needed elsewhere
-            st.session_state['generated_clinton_bom_df_raw'] = bom_df
-
+                # Silently add them to the dictionary with zero quantity
+                pole_quantities_input[part_num] = 0
+    
+    # Order Summary column
+    with summary_col:
+        with st.container():
+            st.markdown("### Order Summary")
+            
+            # Calculate total poles selected
+            total_poles = 0
+            selected_poles = []
+            
+            for part_num, qty in pole_quantities_input.items():
+                if qty > 0:
+                    # Count 2-packs as 2 poles each
+                    if "-2PK" in part_num:
+                        actual_qty = qty * 2
+                        total_poles += actual_qty
+                        selected_poles.append({
+                            "name": clinton_parts[part_num]['desc'],
+                            "qty": qty,
+                            "actual_qty": actual_qty
+                        })
+                    else:
+                        total_poles += qty
+                        selected_poles.append({
+                            "name": clinton_parts[part_num]['desc'],
+                            "qty": qty,
+                            "actual_qty": qty
+                        })
+            
+            # Display total pole count
+            st.metric("Total Poles", total_poles)
+            
+            # Display selected poles
+            if selected_poles:
+                st.markdown("#### Selected Poles")
+                for pole in selected_poles:
+                    if "-2PK" in pole["name"]:
+                        st.markdown(f"• {pole['qty']} x {pole['name']} ({pole['actual_qty']} poles total)")
+                    else:
+                        st.markdown(f"• {pole['qty']} x {pole['name']}")
+            else:
+                st.info("No poles selected yet")
+            
+            # Calculate and display mounting accessories needed
+            if total_poles > 0:
+                st.markdown("#### Accessories (Auto-Added)")
+                st.markdown(f"• {total_poles} x Universal Mounting Plates")
+                st.markdown(f"• {total_poles} x Beam Clamps")
+    
+    # Add a separator
+    st.markdown("---")
+    
+    # BoM Generation Section
+    st.subheader("Generate Bill of Materials")
+    
+    # Help text
+    st.info("Click the button below to generate a Bill of Materials for the selected poles and accessories.")
+    
+    # Generate BoM Button
+    if st.button("Generate Clinton BoM"):
+        if project_id and store_name:
+            # Update session state
+            st.session_state.pole_quantities_input = pole_quantities_input
+            
+            # Generate BoM
+            clinton_bom = generate_clinton_bom(project_id, store_name, reader_count, pole_quantities_input)
+            
+            if clinton_bom:
+                # Create a DataFrame from the BoM
+                df = pd.DataFrame(clinton_bom)
+                
+                # Add Extended Cost column calculation
+                if "Cost" in df.columns and "Quantity" in df.columns:
+                    df["Extended Cost"] = df["Cost"] * df["Quantity"]
+                
+                # Calculate total cost
+                total_cost = df["Extended Cost"].sum() if "Extended Cost" in df.columns else 0
+                
+                # Display the BoM
+                st.success(f"Bill of Materials Generated - Total Cost: ${total_cost:.2f}")
+                st.dataframe(df)
+                
+                # Create Excel file
+                excel_bytes = create_excel_bytes(df, f"{project_id} - {store_name} - Clinton BoM")
+                
+                # Download button
+                st.download_button(
+                    label="Download Clinton BoM Excel",
+                    data=excel_bytes,
+                    file_name=f"{project_id}_{store_name}_Clinton_BoM.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            else:
+                st.error("No items in the Bill of Materials. Please select at least one pole.")
         else:
-            st.info("ℹ️ No Clinton BoM items were generated based on the input provided.")
-            if 'generated_clinton_bom_df_raw' in st.session_state:
-                del st.session_state['generated_clinton_bom_df_raw']
-
+            st.error("Please enter Project ID and Store Name to generate a BoM.")
 
 # ----- MATERIAL ORDER TAB -----
 with tab2:
@@ -863,25 +967,67 @@ Special Delivery Instructions: Inside Delivery Required"""
             
             st.text_area("Clinton Request Text (Copy this to Service Now)", clinton_request, height=300)
 
-# --- Sidebar Info ---
-st.sidebar.header("How to Run")
-st.sidebar.markdown("""
-1.  **Save:** Save this code as `rfid_bom_generator.py`.
-2.  **Requirements:** Ensure `requirements.txt` contains `streamlit`, `pandas`, and `openpyxl`. Install with `pip install -r requirements.txt`.
-3.  **Run:** Use the `start_rfid_bom.bat` file or run from terminal:
-    ```bash
-    streamlit run rfid_bom_generator.py
-    ```
-""")
-
-st.sidebar.header("Add More Parts")
-st.sidebar.markdown("""
-**Clinton Poles/Accessories:**
-Edit the `clinton_parts = {...}` dictionary.
-Format: `"PART-NUM": {"desc": "Desc", "type": "pole" or "accessory", "cost": price}`
-
-**Material Parts:**
-Edit the `material_parts = {...}` dictionary.
-Format: `"PART-NUM": {"desc": "Desc", "manufacturer": "Mfg", "supplier": "Supplier", "cost": price}`
-""")
-# </file>
+# ----- HELP TAB -----
+with tab4:
+    st.header("Help")
+    
+    # How to Run section
+    st.subheader("How to Run")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown("**1. Save:**")
+        st.markdown("**2. Requirements:**")
+        st.markdown("**3. Run:**")
+    
+    with col2:
+        st.markdown("Save this code as `rfid_bom_generator.py`.")
+        st.markdown("Ensure `requirements.txt` contains `streamlit`, `pandas`, and `openpyxl`. Install with `pip install -r requirements.txt`.")
+        st.markdown("Use the `start_rfid_bom.bat` file or run from terminal: `streamlit run rfid_bom_generator.py`")
+    
+    # Adding More Parts section
+    st.subheader("Add More Parts")
+    
+    # Clinton Parts
+    st.markdown("**Clinton Poles/Accessories:**")
+    st.markdown("Edit the `clinton_parts = {...}` dictionary.")
+    st.code("""Format: "PART-NUM": {"desc": "Desc", "type": "pole" or "accessory", "cost": price}""", language="python")
+    
+    # Material Parts
+    st.markdown("**Material Parts:**")
+    st.markdown("Edit the `material_parts = {...}` dictionary.")
+    st.code("""Format: "PART-NUM": {"desc": "Desc", "manufacturer": "Mfg", "supplier": "Supplier", "cost": price}""", language="python")
+    
+    # Using the Application section
+    st.subheader("Using the Application")
+    
+    st.markdown("""
+    **Clinton Pole Order Tab:**
+    1. Enter the Project ID and Store Name
+    2. Set the number of RFID Readers
+    3. Select the quantities for each pole type
+    4. Click 'Generate Clinton BoM' to create the Bill of Materials
+    5. You can download the Excel file with the formatted BoM
+    
+    **Material Order Tab:**
+    1. Project ID and Store Name are shared from the Clinton tab
+    2. Adjust Reader Count if needed
+    3. Set the White CMP CAT6 Cable quantity
+    4. Click 'Generate Material BoM' to create the material list
+    5. Download the Excel file with the complete BoM
+    
+    **Service Now Request Tab:**
+    1. Auto-fills Project ID and Store Name from previous tabs
+    2. Provides a store lookup feature using the site database
+    3. Fuzzy search automatically finds matching sites
+    4. Enter or select an address and parse it automatically
+    5. Generate procurement requests for Anixter and Clinton
+    """)
+    
+    # 2-Pack Optimization note
+    st.info("""
+    **Note:** When ordering 2 or more of the CE-CP412B (Black) or CE-CP412W (White) adjustable poles, 
+    the system will automatically optimize your order to use the 2-pack option (CE-CP412B-2PK or CE-CP412W-2PK), 
+    saving $7.68 per pair. You can also manually select the 2-pack options if desired.
+    """)
