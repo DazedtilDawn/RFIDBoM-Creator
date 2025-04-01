@@ -175,25 +175,25 @@ def generate_clinton_bom(project_id, store_name, reader_count, pole_quantities):
     
     # Add necessary accessories
     if total_poles > 0:
-        # Add universal mounting plates equal to the number of poles
+        # Add universal mounting plates equal to the number of POLES
         bom_items.append({
             "Project": project_id,
             "Required Supplier": supplier,
             "Manufacturer": manufacturer,
             "Manufacturer Part #": "CE-CPUP",
             "Description": clinton_parts["CE-CPUP"]["desc"],
-            "Quantity": total_poles,
+            "Quantity": total_poles,  # Changed back to total_poles as requested
             "Cost": clinton_parts["CE-CPUP"]["cost"]
         })
         
-        # Add beam clamps equal to the number of poles
+        # Add beam clamps equal to the number of POLES
         bom_items.append({
             "Project": project_id,
             "Required Supplier": supplier,
             "Manufacturer": manufacturer,
             "Manufacturer Part #": "CE-CPBCM",
             "Description": clinton_parts["CE-CPBCM"]["desc"],
-            "Quantity": total_poles,
+            "Quantity": total_poles,  # Same as mounting plates
             "Cost": clinton_parts["CE-CPBCM"]["cost"]
         })
     
@@ -616,8 +616,8 @@ with tab1:
             # Calculate and display mounting accessories needed
             if total_poles > 0:
                 st.markdown("#### Accessories (Auto-Added)")
-                st.markdown(f"• {total_poles} x Universal Mounting Plates")
-                st.markdown(f"• {total_poles} x Beam Clamps")
+                st.markdown(f"• {total_poles} x Universal Mounting Plates (based on pole count)")
+                st.markdown(f"• {total_poles} x Beam Clamps (based on pole count)")
     
     # Add a separator
     st.markdown("---")
