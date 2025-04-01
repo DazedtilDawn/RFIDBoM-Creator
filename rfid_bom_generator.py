@@ -52,19 +52,20 @@ pole_part_nums = sorted([p for p, d in clinton_parts.items() if d["type"] == "po
 # --- BoM Generation Functions ---
 def generate_clinton_bom(project_id, store_name, reader_count, pole_quantities):
     """
-    Generates the Bill of Materials list based on user inputs.
+    Generate Bill of Materials (BoM) for Clinton poles and accessories.
+    
     Args:
-        project_id (str): The project identifier.
-        store_name (str): The store name.
-        reader_count (int): Total number of readers (determines accessory counts).
+        project_id (str): Project identifier.
+        store_name (str): Store name.
+        reader_count (int): Number of readers.
         pole_quantities (dict): Dictionary with pole part numbers as keys and quantities as values.
+    
     Returns:
-        list: A list of dictionaries, where each dictionary represents a line item in the BoM.
+        list: List of dictionaries containing BoM items data.
     """
     bom_items = []
-    supplier = "Clinton"
+    supplier = "Clinton" # Required supplier - always Clinton
     manufacturer = "Clinton" # Assuming Clinton is always the manufacturer for these parts
-    # price_expiration = "12/31/2025" # Price expiration is handled by Excel formatting now
 
     # Process the special case for the black adjustable poles (CE-CP412B and CE-CP412B-2PK)
     # If there are 2 or more CE-CP412B poles, use the 2-pack instead
@@ -139,7 +140,7 @@ def generate_clinton_bom(project_id, store_name, reader_count, pole_quantities):
         if qty > 0 and part_num in clinton_parts:
             part_info = clinton_parts[part_num]
             
-            # Handle the case where this is the 2-pack directly selected by the user
+            # Handle the case where this is a 2-pack directly selected by the user
             if part_num in ["CE-CP412B-2PK", "CE-CP412W-2PK"]:
                 # Each 2-pack counts as 2 poles, but we add it as-is since the user specifically selected it
                 bom_items.append({
@@ -166,12 +167,29 @@ def generate_clinton_bom(project_id, store_name, reader_count, pole_quantities):
     
     # Add accessories based on total pole quantity
     # Calculate total number of poles, counting 2-packs as 2 poles each
-    total_poles = sum(pole_quantities.values())
+    total_poles = 0
     
-    # Add any 2-packs that were already in the BoM (each counts as 2 poles)
+    # Count regular poles first
+    for part_num, qty in pole_quantities.items():
+        if qty > 0:
+            if part_num.endswith("-2PK"):
+                # Each 2-pack counts as 2 poles
+                total_poles += qty * 2
+            else:
+                total_poles += qty
+    
+    # Count poles from items already added to the BoM (needed for 2-packs)
     for item in bom_items:
-        if item["Manufacturer Part #"] in ["CE-CP412B-2PK", "CE-CP412W-2PK"]:
-            total_poles += item["Quantity"]  # Add one extra pole for each 2-pack
+        part_num = item["Manufacturer Part #"]
+        # Skip non-pole items
+        if part_num not in clinton_parts or clinton_parts[part_num]["type"] != "pole":
+            continue
+            
+        if part_num.endswith("-2PK"):
+            # Each 2-pack counts as 2 poles
+            total_poles += item["Quantity"] * 2
+        else:
+            total_poles += item["Quantity"]
     
     # Add necessary accessories
     if total_poles > 0:
@@ -182,7 +200,7 @@ def generate_clinton_bom(project_id, store_name, reader_count, pole_quantities):
             "Manufacturer": manufacturer,
             "Manufacturer Part #": "CE-CPUP",
             "Description": clinton_parts["CE-CPUP"]["desc"],
-            "Quantity": total_poles,  # Changed back to total_poles as requested
+            "Quantity": total_poles,  
             "Cost": clinton_parts["CE-CPUP"]["cost"]
         })
         
@@ -193,7 +211,7 @@ def generate_clinton_bom(project_id, store_name, reader_count, pole_quantities):
             "Manufacturer": manufacturer,
             "Manufacturer Part #": "CE-CPBCM",
             "Description": clinton_parts["CE-CPBCM"]["desc"],
-            "Quantity": total_poles,  # Same as mounting plates
+            "Quantity": total_poles,  
             "Cost": clinton_parts["CE-CPBCM"]["cost"]
         })
     
@@ -258,10 +276,13 @@ def create_excel_bytes(df, sheet_title, store_name=None):
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, Color
     from openpyxl.utils.dataframe import dataframe_to_rows
     
+    # Limit sheet title to 31 characters to avoid openpyxl warning
+    safe_sheet_title = sheet_title[:31] if len(sheet_title) > 31 else sheet_title
+    
     # Create a workbook and select the active worksheet
     wb = Workbook()
     ws = wb.active
-    ws.title = sheet_title
+    ws.title = safe_sheet_title
 
     # --- Define Styles to EXACTLY match the reference Excel file ---
     header_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
@@ -405,6 +426,9 @@ if 'project_id' not in st.session_state:
 # Initialize pole quantities dictionary in session state if not already set
 if 'pole_quantities_input' not in st.session_state:
     st.session_state.pole_quantities_input = {}
+    # Initialize all pole part keys
+    for part_num in [k for k, v in clinton_parts.items() if v.get("type") == "pole"]:
+        st.session_state.pole_quantities_input[part_num] = 0
 
 # Initialize session state for reader count if not already set
 if 'reader_count' not in st.session_state:
@@ -462,7 +486,9 @@ with tab1:
     with pole_col:
         # Function to update pole quantities in session state
         def update_pole_qty(part_num):
-            st.session_state.pole_quantities_input[part_num] = st.session_state[f"qty_{part_num}"]
+            # Only update if the key exists in session state
+            if f"qty_{part_num}" in st.session_state:
+                st.session_state.pole_quantities_input[part_num] = st.session_state[f"qty_{part_num}"]
         
         # Filter the poles from the clinton_parts dictionary
         pole_part_nums = [k for k, v in clinton_parts.items() if v.get("type") == "pole"]
