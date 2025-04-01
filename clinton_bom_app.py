@@ -289,7 +289,10 @@ with tab1:
                 # Create a workbook and select the active worksheet
                 wb = Workbook()
                 ws = wb.active
-                ws.title = "Clinton BoM"
+                
+                # Limit sheet title to 31 characters to avoid openpyxl warning
+                safe_sheet_title = "Clinton BoM"
+                ws.title = safe_sheet_title
                 
                 # Define styles
                 header_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
@@ -338,7 +341,7 @@ with tab1:
                     cell.value = f"=F{row}*G{row}"  # Quantity * Cost
                     cell.number_format = '$#,##0.00'
                     cell.border = border
-            
+                
                 # Add total row
                 total_row = last_data_row + 1
                 
@@ -357,7 +360,7 @@ with tab1:
                 sum_cell.number_format = '$#,##0.00'
                 sum_cell.font = Font(bold=True)
                 sum_cell.border = border
-            
+                
                 # Adjust column widths
                 for column in ws.columns:
                     max_length = 0
@@ -500,7 +503,10 @@ with tab2:
                 # Create a workbook and select the active worksheet
                 wb = Workbook()
                 ws = wb.active
-                ws.title = "Material BoM"
+                
+                # Limit sheet title to 31 characters to avoid openpyxl warning
+                safe_sheet_title = "Material BoM"
+                ws.title = safe_sheet_title
                 
                 # Define styles
                 header_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")

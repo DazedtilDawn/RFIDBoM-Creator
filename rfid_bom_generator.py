@@ -442,8 +442,13 @@ if 'cable_quantity' not in st.session_state:
 if 'address_input' not in st.session_state:
     st.session_state.address_input = ""
 
-# Set up the app layout
+# Set up the app layout with minimal file watching
 st.set_page_config(page_title="RFID BoM Generator", layout="wide")
+
+# Disable file watcher to avoid inotify limits in deployed environments
+if os.environ.get('STREAMLIT_ENV') == 'production' or os.environ.get('STREAMLIT_ENV') == 'cloud':
+    st.cache_resource._dont_watch_existing_files = True
+
 st.title("RFID BoM Generator")
 
 # Create tabs
@@ -1057,3 +1062,13 @@ with tab4:
     the system will automatically optimize your order to use the 2-pack option (CE-CP412B-2PK or CE-CP412W-2PK), 
     saving $7.68 per pair. You can also manually select the 2-pack options if desired.
     """)
+
+if __name__ == "__main__":
+    # Ensure all initialization code is above this point
+    import asyncio
+    
+    # Handle potential asyncio issues in different environments
+    try:
+        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+    except RuntimeError:
+        pass  # Ignore if event loop is already running
