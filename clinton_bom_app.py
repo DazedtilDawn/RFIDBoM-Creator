@@ -11,6 +11,8 @@ clinton_parts = {
     "CE-CP3B": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 3ft Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 24.49},
     "CE-CP12W": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 12ft Adjustable, Aluminum/Steel, White", "type": "pole", "cost": 35.52},
     "CE-CP12B": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 12ft Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 35.52},
+    "CE-CP17W": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 6FT-17FT Adjustable, Aluminum/Steel, White", "type": "pole", "cost": 68.63},
+    "CE-CP17B": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 6FT-17FT Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 68.63},
     "CE-CPUP": {"desc": "UNIVERSAL MOUNTING PLATE FOR TELESCOPING CAMERA POLES", "type": "accessory", "cost": 9.59},
     "CE-CPBCM": {"desc": "Camera Pole Beam Clamp", "type": "accessory", "cost": 12.44},
     # Add more parts here if needed following the same format
@@ -68,21 +70,24 @@ def generate_clinton_bom(project_id, reader_count, pole_quantities):
                 "Price Expiration": price_expiration
             })
 
-    # Process Accessories (Plates and Clamps) based on reader count
-    if reader_count > 0:
+    # Calculate the total number of poles
+    total_poles = sum(qty for part, qty in pole_quantities.items() if clinton_parts[part]["type"] == "pole")
+
+    # Process Accessories (Plates and Clamps) based on pole count instead of reader count
+    if total_poles > 0:
         # Mounting Plates
         part_num_plate = "CE-CPUP"
         if part_num_plate in clinton_parts:
              part_info_plate = clinton_parts[part_num_plate]
              cost = part_info_plate.get("cost", 0)
-             extended_cost = cost * reader_count
+             extended_cost = cost * total_poles
              bom_items.append({
                 "Project": project_id,
                 "Required Supplier": supplier,
                 "Manufacturer": manufacturer,
                 "Manufacturer Part #": part_num_plate,
                 "Description": part_info_plate["desc"],
-                "Quantity": reader_count,
+                "Quantity": total_poles,
                 "Cost": cost,
                 "Extended Cost": extended_cost,
                 "Price Expiration": price_expiration
@@ -92,14 +97,14 @@ def generate_clinton_bom(project_id, reader_count, pole_quantities):
         if part_num_clamp in clinton_parts:
             part_info_clamp = clinton_parts[part_num_clamp]
             cost = part_info_clamp.get("cost", 0)
-            extended_cost = cost * reader_count
+            extended_cost = cost * total_poles
             bom_items.append({
                 "Project": project_id,
                 "Required Supplier": supplier,
                 "Manufacturer": manufacturer,
                 "Manufacturer Part #": part_num_clamp,
                 "Description": part_info_clamp["desc"],
-                "Quantity": reader_count,
+                "Quantity": total_poles,
                 "Cost": cost,
                 "Extended Cost": extended_cost,
                 "Price Expiration": price_expiration
@@ -223,8 +228,17 @@ with tab1:
             label = "CE-CP12B (6-12ft Black Pole)"
             pole_quantities_input["CE-CP12B"] = st.number_input(label, min_value=0, step=1, value=0, key=f"qty_CE-CP12B")
         
+        # 17ft poles
+        st.markdown("**17ft Poles**")
+        if "CE-CP17W" in clinton_parts:
+            label = "CE-CP17W (17ft White Pole)"
+            pole_quantities_input["CE-CP17W"] = st.number_input(label, min_value=0, step=1, value=0, key=f"qty_CE-CP17W")
+        if "CE-CP17B" in clinton_parts:
+            label = "CE-CP17B (17ft Black Pole)"
+            pole_quantities_input["CE-CP17B"] = st.number_input(label, min_value=0, step=1, value=0, key=f"qty_CE-CP17B")
+        
         # Make sure we include any other poles that might be added in the future
-        other_poles = [p for p in pole_part_nums if p not in ["CE-CP3W", "CE-CP3B", "CE-CP6W", "CE-CP6B", "CE-CP12W", "CE-CP12B"]]
+        other_poles = [p for p in pole_part_nums if p not in ["CE-CP3W", "CE-CP3B", "CE-CP6W", "CE-CP6B", "CE-CP12W", "CE-CP12B", "CE-CP17W", "CE-CP17B"]]
         if other_poles:
             st.markdown("**Other Poles**")
             for part_num in other_poles:
@@ -619,7 +633,6 @@ with tab2:
             st.session_state['generated_material_bom_df'] = bom_df
         else:
             st.info("ℹ️ No Material BoM items were generated.")
-{{ ... }}
 
 # --- How to Run ---
 st.sidebar.header("How to Run")

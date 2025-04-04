@@ -14,17 +14,20 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 # Dictionary holding the details for each Clinton part we know about
 clinton_parts = {
     # Part Num: {desc: Description, type: 'pole' or 'accessory', cost: unit price}
-    "CE-CP8B": {"desc": "8' Fixed Height Pole, Black", "type": "pole", "cost": 31.36},
-    "CE-CP6W": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 6ft Adjustable, Aluminum/Steel, White", "type": "pole", "cost": 29.47},
-    "CE-CP6B": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 6ft Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 29.47},
+    # 3ft Poles
     "CE-CP3W": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 3ft Adjustable, Aluminum/Steel, White", "type": "pole", "cost": 24.49},
     "CE-CP3B": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 3ft Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 24.49},
-    "CE-CP412B": {"desc": "Adjustable from 3' 11.25\" to 10' 11.25\", Black, UL", "type": "pole", "cost": 35.52},
-    "CE-CP412B-2PK": {"desc": "Adjustable from 3' 11.25\" to 10' 11.25\", Black, UL Two Poles per Box, Sold as Pair", "type": "pole", "cost": 63.36, "is_pair": True},
-    "CE-CP412W": {"desc": "Adjustable from 3' 11.25\" to 10' 11.25\", White, UL", "type": "pole", "cost": 35.52},
-    "CE-CP412W-2PK": {"desc": "Adjustable from 3' 11.25\" to 10' 11.25\", White, UL Two Poles per Box, Sold as Pair", "type": "pole", "cost": 63.36, "is_pair": True},
-    "CE-CP16B": {"desc": "16' Fixed Height Pole, Black", "type": "pole", "cost": 63.36},
-    "CE-CP20B": {"desc": "20' Fixed Height Pole, Black", "type": "pole", "cost": 79.20},
+    # 6ft Poles
+    "CE-CP6W": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 6ft Adjustable, Aluminum/Steel, White", "type": "pole", "cost": 29.47},
+    "CE-CP6B": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 6ft Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 29.47},
+    # Adjustable Poles (include 2-packs)
+    "CE-CP412W": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 4'-11\" to 12'-11\" Adjustable, Aluminum/Steel, White", "type": "pole", "cost": 37.19},
+    "CE-CP412B": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 4'-11\" to 12'-11\" Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 37.19},
+    "CE-CP412W-2PK": {"desc": "2-Pack Telescoping Pole w/Bracket, Ceiling Mount, 4'-11\" to 12'-11\" Adjustable, Aluminum/Steel, White", "type": "pole", "cost": 69.84},
+    "CE-CP412B-2PK": {"desc": "2-Pack Telescoping Pole w/Bracket, Ceiling Mount, 4'-11\" to 12'-11\" Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 69.84},
+    # 17ft Poles
+    "CE-CP17W": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 6FT-17FT Adjustable, Aluminum/Steel, White", "type": "pole", "cost": 68.63},
+    "CE-CP17B": {"desc": "Telescoping Pole w/Bracket, Ceiling Mount, 6FT-17FT Adjustable, Aluminum/Steel, Black", "type": "pole", "cost": 68.63},
     # Accessories
     "CE-CPUP": {"desc": "UNIVERSAL MOUNTING PLATE FOR TELESCOPING CAMERA POLES", "type": "accessory", "cost": 9.59},
     "CE-CPBCM": {"desc": "Camera Pole Beam Clamp", "type": "accessory", "cost": 12.44},
@@ -169,16 +172,8 @@ def generate_clinton_bom(project_id, store_name, reader_count, pole_quantities):
     # Calculate total number of poles, counting 2-packs as 2 poles each
     total_poles = 0
     
-    # Count regular poles first
-    for part_num, qty in pole_quantities.items():
-        if qty > 0:
-            if part_num.endswith("-2PK"):
-                # Each 2-pack counts as 2 poles
-                total_poles += qty * 2
-            else:
-                total_poles += qty
-    
-    # Count poles from items already added to the BoM (needed for 2-packs)
+    # We need to properly count the poles based only on what's in the bom_items
+    # and avoid double-counting by removing the code that counts from pole_quantities
     for item in bom_items:
         part_num = item["Manufacturer Part #"]
         # Skip non-pole items
@@ -594,9 +589,37 @@ with tab1:
             if "CE-CP412B-2PK" in clinton_parts:
                 pole_quantities_input["CE-CP412B-2PK"] = 0
         
+        # Add 17ft poles section
+        with st.expander("17ft Poles (6'-0\" to 17'-0\")", expanded=True):
+            cols = st.columns(2)
+            with cols[0]:
+                if "CE-CP17W" in clinton_parts:
+                    label = "17ft White Pole"
+                    pole_quantities_input["CE-CP17W"] = st.number_input(
+                        label, 
+                        min_value=0, 
+                        step=1, 
+                        value=st.session_state.pole_quantities_input.get("CE-CP17W", 0), 
+                        key=f"qty_CE-CP17W", 
+                        on_change=update_pole_qty, 
+                        args=("CE-CP17W",)
+                    )
+            with cols[1]:
+                if "CE-CP17B" in clinton_parts:
+                    label = "17ft Black Pole"
+                    pole_quantities_input["CE-CP17B"] = st.number_input(
+                        label, 
+                        min_value=0, 
+                        step=1, 
+                        value=st.session_state.pole_quantities_input.get("CE-CP17B", 0), 
+                        key=f"qty_CE-CP17B", 
+                        on_change=update_pole_qty, 
+                        args=("CE-CP17B",)
+                    )
+        
         # Add other poles not in the main categories directly to pole_quantities_input 
         # but don't display them in the UI
-        other_poles = [p for p in pole_part_nums if p not in ["CE-CP3W", "CE-CP3B", "CE-CP6W", "CE-CP6B", "CE-CP412B", "CE-CP412B-2PK", "CE-CP412W", "CE-CP412W-2PK"]]
+        other_poles = [p for p in pole_part_nums if p not in ["CE-CP3W", "CE-CP3B", "CE-CP6W", "CE-CP6B", "CE-CP412B", "CE-CP412B-2PK", "CE-CP412W", "CE-CP412W-2PK", "CE-CP17W", "CE-CP17B"]]
         if other_poles:
             for part_num in other_poles:
                 # Silently add them to the dictionary with zero quantity
